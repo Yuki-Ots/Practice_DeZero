@@ -1,12 +1,53 @@
 """
+TODO
+- numerical_diff が使えなくなった　修正せよ
+- x.grad += gx としてはいけない理由を理解せよ
+- pythonの機能の理解 see study.txt
+- Funcion class の forward(self, *xs)では？
+- Funcion class の backward(self, *gys)では？
+- funcはキューじゃダメなの？
+
+
 4/19 メモ
 Variableクラスを被せることで自動微分をやり易くしている。
 具体的にはVariableクラスに値、値を生成した関数、勾配を保存している
 Variableクラスのメンバ関数であるbackwardで、保存した関数のbackward()を呼び出す。
 
-TODO
-なぜ funcというリストを作るの？
+4/25メモ
+- gx は gradient of xの略
+- xs は xの複数形だが x.data のリスト
+- clear_grad において self.grad = 0 じゃなくて None
+
+4/26
+- クラスの関係についてのメモを作成した
+x = Variable(np.array(2.0))
+y = add(add(x, x), x)
+y.backward()
+print('first time', x.grad)
+x.clear_grad()
+y = add(x, x)
+y.backward()
+print('second time', x.grad)
+
+# clear_gradなし
+# first time 3.0
+# second time 5.0
+# あり
+# first time 3.0
+# second time 2.0
+
+x = Variable(np.array(2.0))
+a = exp(x)
+y = add(a, a)
+y.backward()
+print(x.grad)
+# 29.5562243957226
+
+
+DONE
+なぜ funcというリストを作るの？ stackを作るため
 assert type(self.data) == np.ndarray 使い方が間違っているようだ。来週確認する。
+間違いでは内容だがassert isinstance(self.grad, np.ndarray)が適切
 
 """
 
@@ -20,13 +61,14 @@ class Variable:
                 raise TypeError('{} is not supported (a numpy array is supported)'.format(type(data)))
 
         self.data = data
-        # assert type(self.data) == np.ndarray 使い方が間違っているようだ。来週確認する。
         self.grad = None
-        # assert type(self.data) == np.ndarray
         self.creator = None
 
     def set_creator(self, func):
         self.creator = func
+
+    def clear_grad(self):
+        self.grad = None
 
     def backward(self):
         if self.grad is None:
@@ -35,28 +77,39 @@ class Variable:
         funcs = [self.creator]  # なぜ funcというリストを作るの？
         while funcs:
             f = funcs.pop()
-            x, y = f.input, f.output
-            x.grad = f.backward(y.grad)
+            gys = [output.grad for output in f.outputs]
+            gxs = f.backward(*gys)
+            if not isinstance(gxs, tuple):
+                gxs = (gxs,)
 
-            if x.creator is not None:
-                funcs.append(x.creator)
+            for x, gx in zip(f.inputs, gxs):
+                if x.grad is None:
+                    x.grad = gx
+                else:
+                    x.grad = x.grad + gx
+
+                if x.creator is not None:
+                    funcs.append(x.creator)
 
 
 # (数学の)関数を実装するの基底クラス
 class Function:
-    def __call__(self, input):
-        x = input.data
-        y = self.forward(x)  # 具体的な計算はforwardをオーバーライドして書く
-        output = Variable(as_array(y))
-        output.set_creator(self)  # 出力変数に産みの親を覚えさせる
-        self.input = input  # 入力した値を覚えておく
-        self.output = output  # 出力も覚える
-        return output
+    def __call__(self, *inputs):
+        xs = [x.data for x in inputs]
+        ys = self.forward(*xs)  # 具体的な計算はforwardをオーバーライドして書く
+        if not isinstance(ys, tuple):
+            ys = (ys, )
+        outputs = [Variable(as_array(y)) for y in ys]
+        for output in outputs:
+            output.set_creator(self)
+        self.inputs = inputs  # 入力した値を覚えておく
+        self.outputs = outputs  # 出力も覚える
+        return outputs if len(outputs) > 1 else outputs[0]  # リストの要素が1つの時は最初の要素を返す
 
-    def forward(self, input: Variable):
+    def forward(self, *xs):
         raise NotImplementedError()
 
-    def backward(self, gy):
+    def backward(self, *gys):
         raise NotImplementedError()
 
 
@@ -66,7 +119,7 @@ class Square(Function):
         return y
 
     def backward(self, gy):
-        x = self.input.data
+        x = self.inputs[0].data
         gx = 2 * x * gy
         return gx
 
@@ -77,7 +130,8 @@ class Exp(Function):
         return y
 
     def backward(self, gy):
-        x = self.input.data
+        print("backward exp")
+        x = self.inputs[0].data
         gx = np.exp(x) * gy
         return gx
 
@@ -88,11 +142,12 @@ class ReLU(Function):
         return y
 
     def backward(self, gy):
-        x = self.input.data
+        x = self.inputs[0].data
         if x >= 0:
             return gy
         else:
             return np.zeros_like(gy)
+
 
 class Step(Function):
     def forward(self, x):
@@ -101,6 +156,25 @@ class Step(Function):
 
     def backward(self, gy):
         return np.zeros_like(gy)
+
+
+class Add(Function):
+    def forward(self, x0, x1):
+        y = x0 + x1
+        return y
+
+    def backward(self, gy):
+        print("backward of add")
+        return gy, gy
+
+
+class Multiply(Function):
+    def forward(self, x0, x1):
+        return x0 * x1
+
+    def backward(self, gy):
+        x0, x1 = self.inputs[0].data, self.inputs[1].data
+        return x1 * gy, x0 * gy
 
 
 def numerical_diff(f, x: Variable, eps=1e-4):
@@ -121,12 +195,20 @@ def exp(x):
     return f(x)
 
 
-def relu(x):
+def relu(x: Variable) -> Variable:
     f = ReLU()
     return f(x)
 
 
-def step(x):
+def add(x0: Variable, x1: Variable) -> Variable:
+    return Add()(x0, x1)
+
+
+def multiply(x0: Variable, x1: Variable) -> Variable:
+    return Multiply()(x0, x1)
+
+
+def step(x: Variable) -> Variable:
     f = Step()
     return f(x)
 
@@ -137,8 +219,23 @@ def as_array(x):
     return x
 
 
-x = Variable(np.array(0.5))
-y = square(exp(square(x)))
+x = Variable(np.array(2.0))
+a = exp(x)
+y = add(a, a)
 y.backward()
 print(x.grad)
+# 29.5562243957226
+
+
+# clear_gradなし
+# first time 3.0
+# second time 5.0
+# あり
+# first time 3.0
+# second time 2.0
+
+# func = lambda x: add(add(x, x), x)
+# numerical_diff(func, x)
+
+
 
