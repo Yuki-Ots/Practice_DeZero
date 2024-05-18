@@ -1,7 +1,7 @@
 # $ python -m unittest discover tests
 
 import unittest
-from main import *
+from others.main import *
 
 class SquareTest(unittest.TestCase):
     def test_forward(self):
