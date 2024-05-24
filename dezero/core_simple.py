@@ -51,7 +51,7 @@ class Variable:
 
     def backward(self, retain_grad=False):
         if self.grad is None:
-            self.grad = np.ones_like(self.data)
+            self.grad = Variable(np.ones_like(self.data))
 
         funcs = []
         seen_set = set()
@@ -83,6 +83,36 @@ class Variable:
             if not retain_grad:  # 末端のVariableでないなら
                 for y in f.outputs:
                     y().grad = None  # outputのgradを解放
+
+    def __add__(self, other):
+        return add(self, other)
+
+    def __radd__(self, l_other):
+        return add(self, l_other)
+
+    def __sub__(self, other):
+        return sub(self, other)
+
+    def __rsub__(self, l_other):
+        return rsub(self, l_other)
+
+    def __mul__(self, other):
+        return mul(self, other)
+
+    def __rmul__(self, l_other):
+        return mul(self, l_other)
+
+    def __truediv__(self, other):
+        return div(self, other)
+
+    def __rtruediv__(self, l_other):
+        return rdiv(self, l_other)
+
+    def __pow__(self, c):
+        return pow(self, c)
+
+    def __neg__(self):
+        return neg(self)
 
 
 class Function:
