@@ -5,7 +5,6 @@ from matplotlib import pyplot as plt
 
 from dezero import Variable
 
-
 def f(x):
     y = x ** 4 - 4 * x ** 2
     return y

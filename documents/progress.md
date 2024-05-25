@@ -170,3 +170,18 @@ x.grad = x.grad + gx
 5/24
 self.grad: Variable = Noneとしたら
 gradにも補完が効く様になった。
+
+
+```py
+x -= lr *x.grad
+と書いてはいけない理由
+
+numpyと違って新しいインスタンスを生成しているため。
+id(x)
+Out[24]: 5347905552
+x -= lr *x.grad
+id(x)
+Out[26]: 5347915584
+
+x.data -= lr * x.grad.dataとする必要がある。
+```

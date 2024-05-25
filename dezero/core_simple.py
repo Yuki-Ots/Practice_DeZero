@@ -51,7 +51,7 @@ class Variable:
 
     def backward(self, retain_grad=False):
         if self.grad is None:
-            self.grad = Variable(np.ones_like(self.data))
+            self.grad = np.ones_like(self.data)
 
         funcs = []
         seen_set = set()
