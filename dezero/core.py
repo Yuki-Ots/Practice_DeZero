@@ -1,6 +1,7 @@
 import numpy as np
 import weakref
 import contextlib
+import dezero
 
 
 class Config:
@@ -114,23 +115,46 @@ class Variable:
     def __neg__(self):
         return neg(self)
 
+    def reshape(self, *shape):
+        if len(shape) == 1 and isinstance(shape[0], (tuple, list)):
+            shape = shape[0]
+        return dezero.functions.reshape(self, shape)
+
+    def transpose(self, *axes):
+        if len(axes) == 0:
+            axes = None
+        elif len(axes) == 1 and isinstance(axes[0], (tuple, list)):
+            axes = axes[0]
+        return dezero.functions.transpose(self, axes)
+
+    @property
+    def T(self):
+        return dezero.functions.transpose(self)
+
+    def sum(self, axis=None, keepdims=False):
+        pass
+
+
 
 class Function:
     def __call__(self, *inputs):
         inputs = [as_variable(x) for x in inputs]
 
         xs = [x.data for x in inputs]
-        ys = self.forward(*xs)  # 具体的な計算はforwardをオーバーライドして書く
+        # 具体的な計算はforwardをオーバーライドして書く
+        ys = self.forward(*xs)
         if not isinstance(ys, tuple):
             ys = (ys,)
         outputs = [Variable(as_array(y)) for y in ys]
 
-        if Config.enable_backprop:  # 真の時計算グラフを構築する
-            self.generation = max([x.generation for x in inputs])  # 入力の世代の最大の物に合わせる
+        # 真のとき計算グラフを構築する
+        if Config.enable_backprop:
+            self.generation = max([x.generation for x in inputs])
             for output in outputs:
                 output.set_creator(self)
-            self.inputs = inputs  # 入力した値を覚えておく
-            self.outputs = [weakref.ref(output) for output in outputs]  # weakrefで保持しておくことで循環参照を作らない
+            self.inputs = inputs
+            # weakrefで保持しておくことで循環参照を作らない
+            self.outputs = [weakref.ref(output) for output in outputs]
 
         return outputs if len(outputs) > 1 else outputs[0]  # リストの要素が1つの時は最初の要素を返す
 

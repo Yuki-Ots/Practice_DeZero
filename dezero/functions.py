@@ -1,5 +1,6 @@
-from dezero import Variable
-from dezero import Function
+import dezero
+from dezero import Variable, Function, as_variable, as_array
+from dezero import as_variable
 import numpy as np
 
 class Exp(Function):
@@ -8,7 +9,7 @@ class Exp(Function):
         return y
     def backward(self, gy):
         x, = self.inputs
-        gx = np.exp(x) * gy
+        gx = exp(x) * gy
         return gx
 
 
@@ -79,6 +80,70 @@ class Tanh(Function):
     def backward(self, gy):
         y = self.outputs[0]()
         gx = gy * (1 - y ** 2)
+
+
+class ReShape(Function):
+    def __init__(self, shape):
+        self.shape = shape
+
+    def forward(self, x):
+        self.x_shape = x.shape  # backwardの時のためにxの元のshapeを保持しておく。
+        y = x.reshape(self.shape)
+        return y
+
+
+    def backward(self, gy):
+        gx = reshape(gy, self.x_shape)
+        return gx
+
+
+def reshape(x, shape):
+    if x.shape == shape:  # reshapeする必要がなかった場合、Variableであることだけ保証して返す。保証されてないとIDEが型推論する時に正常に動作しない？
+        return as_variable(x)
+    return ReShape(shape)(x)
+
+
+class Transpose(Function):
+    def __init__(self, axes=None):
+        self.axes = axes
+
+    def forward(self, x):
+        y = x.transpose(self.axes)
+        return y
+
+    def backward(self, gy):
+        if self.axes is None:
+            return transpose(gy)
+
+        axes_len = len(self.axes)
+        inv_axes = tuple(np.argsort([ax % axes_len for ax in self.axes]))
+        return transpose(gy, inv_axes)
+
+def transpose(x, axes):
+    return Transpose(None)(x, axes)
+
+
+def numerical_grad(f, x:Variable):
+    h = 1e-4
+    grad = np.zeros_like(x.data)
+    it = np.nditer(x.data, flags=['multi_index'])
+
+    with no_grad():
+        while not it.finished:
+            idx = it.multi_index
+            tmp = x.data[idx]
+            x.data[idx] = tmp + h
+            fx2 = f(x)
+            x.data[idx] = tmp - h
+            fx1 = f(x)
+            grad[idx] = (fx2.data - fx1.data) / (2 * h)
+
+    return grad
+
+
+
+
+
 
 
 # class ReLU

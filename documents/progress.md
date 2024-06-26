@@ -185,3 +185,19 @@ Out[26]: 5347915584
 
 x.data -= lr * x.grad.dataとする必要がある。
 ```
+
+class Exp
+backward
+np.exp(x) * gy
+だめ
+Variableをnp.expに入れられない
+
+循環参照
+Traceback (most recent call last):
+  File "/Users/ootsukayuuki/program/pythonPgms/hoge1.py", line 1, in <module>
+    from hoge2 import hoge2hello
+  File "/Users/ootsukayuuki/program/pythonPgms/hoge2.py", line 1, in <module>
+    from hoge1 import hoge1hello
+  File "/Users/ootsukayuuki/program/pythonPgms/hoge1.py", line 1, in <module>
+    from hoge2 import hoge2hello
+ImportError: cannot import name 'hoge2hello' from partially initialized module 'hoge2' (most likely due to a circular import) (/Users/ootsukayuuki/program/pythonPgms/hoge2.py)
