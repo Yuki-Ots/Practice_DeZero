@@ -10,7 +10,7 @@ def _dot_var(v, verbose=False):
     if verbose and v.data is not None:
         if v.name is not None:
             name += ': '
-        name += str(v.shape) + ' ' + str(v.dtype)
+        name += str(v.data) + str(v.shape) + ' ' + str(v.dtype)
     return dot_var.format(id(v), name)
 
 def _dot_func(f):
@@ -64,3 +64,39 @@ def plot_dot_graph(output, verbose=False, to_file='graph_png', dpi=300, ratio=0.
     extension = os.path.splitext(to_file)[1][1:]
     cmd = 'dot {} -T {}  -o {}'.format(graph_path, extension, to_file)
     subprocess.run(cmd, shell=True)  # shell=Trueとしておくと文字列で実行できる
+    try:
+        from IPython import display
+        return display.Image(filename=to_file)
+    except:
+        pass
+
+def sum_to(x, shape):
+    ndim = len(shape)
+    lead = x.ndim - ndim
+    lead_axis = tuple(range(lead))
+
+    axis = tuple([i + lead for i, sx in enumerate(shape) if sx == 1])
+    y = x.sum(lead_axis + axis, keepdims=True)
+    if lead > 0:
+        y = y.squeeze(lead_axis)
+    return y
+
+
+def reshape_sum_backward(gy, x_shape, axis, keepdims):
+    ndim = len(x_shape)
+    tupled_axis = axis
+    if axis is None:
+        tupled_axis = None
+    elif not isinstance(axis, tuple):
+        tupled_axis = (axis,)
+
+    if not (ndim == 0 or tupled_axis is None or keepdims):
+        actual_axis = [a if a >= 0 else a + ndim for a in tupled_axis]
+        shape = list(gy.shape)
+        for a in sorted(actual_axis):
+            shape.insert(a, 1)
+    else:
+        shape = gy.shape
+
+    gy = gy.reshape(shape)  # reshape
+    return gy

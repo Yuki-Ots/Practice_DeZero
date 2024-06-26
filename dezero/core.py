@@ -115,6 +115,9 @@ class Variable:
     def __neg__(self):
         return neg(self)
 
+    def matmul(self, W):
+        return dezero.functions.matmul(self, W)
+
     def reshape(self, *shape):
         if len(shape) == 1 and isinstance(shape[0], (tuple, list)):
             shape = shape[0]
@@ -123,8 +126,9 @@ class Variable:
     def transpose(self, *axes):
         if len(axes) == 0:
             axes = None
-        elif len(axes) == 1 and isinstance(axes[0], (tuple, list)):
-            axes = axes[0]
+        elif len(axes) == 1:
+            if isinstance(axes[0], (tuple, list)) or axes[0] is None:
+                axes = axes[0]
         return dezero.functions.transpose(self, axes)
 
     @property
@@ -132,7 +136,7 @@ class Variable:
         return dezero.functions.transpose(self)
 
     def sum(self, axis=None, keepdims=False):
-        pass
+        return dezero.functions.sum(self, axis, keepdims)
 
 
 
@@ -165,13 +169,22 @@ class Function:
         raise NotImplementedError()
 
 
+class Parameter(Variable):
+    pass
+
+
 class Add(Function):
     def forward(self, x0, x1):
+        self.x0_shape, self.x1_shape = x0.shape, x1.shape
         y = x0 + x1
         return y
 
     def backward(self, gy):
-        return gy, gy
+        gx0, gx1 = gy, gy
+        if self.x0_shape != self.x1_shape:
+            gx0 = dezero.functions.sum_to(gx0, self.x0_shape)
+            gx1 = dezero.functions.sum_to(gx1, self.x1_shape)
+        return gx0, gx1
 
 
 def add(x0: Variable, x1) -> Variable:
@@ -185,7 +198,11 @@ class Mul(Function):
 
     def backward(self, gy):
         x0, x1 = self.inputs  # gy, x0, x1はVariable型
-        return x1 * gy, x0 * gy
+        gx0, gx1 = x1 * gy, x0 * gy
+        if x0.shape != x1.shape:
+            gx0 = dezero.functions.sum_to(gx0, x0.shape)
+            gx1 = dezero.functions.sum_to(gx1, x1.shape)
+        return gx0, gx1
 
 
 def mul(x0: Variable, x1) -> Variable:
@@ -207,11 +224,16 @@ def neg(x):
 
 class Sub(Function):
     def forward(self, x0, x1):
+        self.x0_shape, self.x1_shape = x0.shape, x1.shape
         y = x0 - x1
         return y
 
     def backward(self, gy):
-        return gy, -gy
+        gx0, gx1 = gy, -gy
+        if self.x0_shape != self.x1_shape:
+            gx0 = dezero.functions.sum_to(gx0, self.x0_shape)
+            gx1 = dezero.functions.sum_to(gx1, self.x1_shape)
+        return gx0, gx1
 
 
 def sub(x0, x1):
@@ -231,8 +253,12 @@ class Div(Function):
 
     def backward(self, gy):
         x0, x1 = self.inputs
-        gx0 = gy * x1
+        gx0 = gy / x1
         gx1 = - gy * x0 / (x1 ** 2)
+        if x0.shape != x1.shape:
+            gx0 = dezero.functions.sum_to(gx0, x0.shape)
+            gx1 = dezero.functions.sum_to(gx1, x1.shape)
+        return gx0, gx1
 
 
 def div(x0, x1):
