@@ -9,7 +9,7 @@ class Config:
 
 
 class Variable:
-    __array__priority__ = 200
+    __array_priority__ = 200
 
     def __init__(self, data, name=None):
         if data is not None:
@@ -51,6 +51,11 @@ class Variable:
         self.grad = None
 
     def backward(self, retain_grad=False, create_graph=False):
+        """
+
+        :type retain_grad: bool,
+        :type create_graph: bool,
+        """
         if self.grad is None:
             self.grad = Variable(np.ones_like(self.data))
 
@@ -68,10 +73,10 @@ class Variable:
         while funcs:
             f = funcs.pop()
             gys = [output().grad for output in f.outputs]
-            gxs = f.backward(*gys)
-            if not isinstance(gxs, tuple):
-                gxs = (gxs,)
             with using_config('enable_backprop', create_graph):
+                gxs = f.backward(*gys)
+                if not isinstance(gxs, tuple):
+                    gxs = (gxs,)
                 for x, gx in zip(f.inputs, gxs):
                     if x.grad is None:
                         x.grad = gx
@@ -114,6 +119,9 @@ class Variable:
 
     def __neg__(self):
         return neg(self)
+
+    def __getitem__(self, item):
+        return dezero.functions.get_item(self, item)
 
     def matmul(self, W):
         return dezero.functions.matmul(self, W)

@@ -10,7 +10,7 @@ def _dot_var(v, verbose=False):
     if verbose and v.data is not None:
         if v.name is not None:
             name += ': '
-        name += str(v.data) + str(v.shape) + ' ' + str(v.dtype)
+        name += str(v.shape) + ' ' + str(v.dtype)
     return dot_var.format(id(v), name)
 
 def _dot_func(f):

@@ -13,6 +13,7 @@ y.name = 'y'
 y.backward(create_graph=True)
 print(x.grad)
 
+# 新しく x.gradの参照するインスタンスの参照を作る
 gx = x.grad
 x.cleargrad()
 gx.name = 'x.grad'

@@ -176,20 +176,6 @@ class BroadcastTo(Function):
         return gx
 
 
-# class BroadcastTo(Function):
-#     def __init__(self, shape):
-#         self.shape = shape
-#
-#     def forward(self, x):
-#         self.x_shape = x.shape
-#         xp = dezero.cuda.get_array_module(x)
-#         y = xp.broadcast_to(x, self.shape)
-#         return y
-#
-#     def backward(self, gy):
-#         gx = sum_to(gy, self.x_shape)
-#         return gx
-
 def broadcast_to(x, shape):
     if x.shape == shape:
         return as_variable(x)
@@ -280,6 +266,44 @@ class Sigmoid(Function):
 def sigmoid(x):
     return Sigmoid()(x)
 
+class GetItem(Function):
+    def __init__(self, slices):
+        self.slices = slices
+
+    def forward(self, x):
+        y = x[self.slices]
+        return y
+
+    def backward(self, gy):
+        x, = self.inputs
+        f = GetItemGrad(self.slices, x.shape)
+        return f(gy)
+
+
+class GetItemGrad(Function):
+    def __init__(self, slices, in_shape):
+        self.slices = slices
+        self.in_shape = in_shape
+
+    def forward(self, gy):
+        # xp = dezero.cuda.get_array_module(gy)
+        xp = np
+        gx = xp.zeros(self.in_shape, dtype=gy.dtype)
+
+        if xp is np:
+            np.add.at(gx, self.slices, gy)
+        else:
+            xp.scatter_add(gx, self.slices, gy)
+        return gx
+
+    def backward(self, ggx):
+        return get_item(ggx, self.slices)
+
+
+def get_item(x, slices):
+    f = GetItem(slices)
+    return f(x)
+
 
 class ReLU(Function):
     def __init__(self):
@@ -291,8 +315,7 @@ class ReLU(Function):
         return y
 
     def backward(self, gy):
-        gx = 0.0 + gy
-        gx.data[self.mask] = 0.0
+        gx = (~self.mask).astype(np.float32) * gy
         return gx
 
 def relu(x):
@@ -318,3 +341,81 @@ def numerical_grad(f, x:Variable, eps=1e-6):
             x.data[idx] = tmp
             it.iternext()
     return grads
+
+
+# class Softmax(Function):
+#     def __init__(self, axis):
+#         self.axis = axis
+#     def forward(self, x, axis=1):
+#         x = x - np.max(x, axis=axis, keepdims=True)
+#         exp_x = np.exp(x)
+#         y = exp_x / np.sum(exp_x, axis=axis, keepdims=True)
+#         self.y = y
+#         return y
+#
+#     def backward(self, gy):
+#         y = self.outputs[0]()
+#         y = - broadcast_to(y, (y.shape[1], y.shape[1]))
+#         y += np.identity(y.shape[1])
+#         y = self.y.T * y
+#         return y
+
+def softmax_simple(x, axis=1):
+    x = as_variable(x)
+    y = exp(x)
+    sum_y = sum(y, axis=axis, keepdims=True)
+    return y / sum_y
+
+
+class Softmax(Function):
+    def __init__(self, axis=1):
+        self.axis = axis
+
+    def forward(self, x):
+        xp = cuda.get_array_module(x)
+        y = x - x.max(axis=self.axis, keepdims=True)
+        y = xp.exp(y)
+        y /= y.sum(axis=self.axis, keepdims=True)
+        return y
+
+    def backward(self, gy):
+        y = self.outputs[0]()
+        gx = y * gy
+        sumdx = gx.sum(axis=self.axis, keepdims=True)
+        gx -= y * sumdx
+        return gx
+
+def softmax(x, axis=-1):
+    return Softmax()(x)
+
+
+def softmax_cross_entropy_simple(x, t):
+    x, t = as_variable(x), as_variable(t)
+    N = x.shape[0]
+    p = softmax_simple(x)
+    p = clip(p, 1e-15, 1.0)
+    log_p = log(p)
+    tlogp = log_p[np.arange(N), t.data]
+    y = - 1 * sum(tlogp) / N
+    return y
+
+
+class Clip(Function):
+    def __init__(self, x_min, x_max):
+        self.x_min = x_min
+        self.x_max = x_max
+
+    def forward(self, x):
+        xp = cuda.get_array_module(x)
+        y = xp.clip(x, self.x_min, self.x_max)
+        return y
+
+    def backward(self, gy):
+        x, = self.inputs
+        mask = (x.data >= self.x_min) * (x.data <= self.x_max)
+        gx = gy * mask
+        return gx
+
+
+def clip(x, x_min, x_max):
+    return Clip(x_min, x_max)(x)

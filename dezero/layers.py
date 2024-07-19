@@ -1,13 +1,14 @@
 from dezero.core import Parameter
 import weakref
 import dezero.functions as F
+import numpy as np
 
 class Layer:
     def __init__(self):
         self._params = set()
 
     def __setattr__(self, name, value):
-        if isinstance(value, Parameter):
+        if isinstance(value, (Parameter, Layer)):
             self._params.add(name)
         super().__setattr__(name, value)
 
@@ -24,13 +25,41 @@ class Layer:
 
     def params(self):
         for name in self._params:
-            yield self.__dict__[name]
+            value = self.__dict__[name]
+            if isinstance(value, Layer):
+                yield from value.params()
+            else:
+                yield self.__dict__[name]
 
-    def clear_grads(self):
+    def cleargrads(self):
         for param in self.params():
-            param.clear_grad()
+            param.cleargrad()
 
 
 class Linear(Layer):
-    def __init__(self, ):
-        pass
+    def __init__(self, out_size, no_bias=False, dtype=np.float32, in_size=None):
+        super().__init__()
+        self.in_size = in_size
+        self.out_size = out_size
+        self.dtype = dtype
+        self.W = Parameter(None, name='W')
+        if self.in_size is not None:
+            self._init_W()
+
+        if no_bias:
+            self.b = None
+        else:
+            self.b = Parameter(np.zeros(out_size), name='b')
+
+    def _init_W(self):
+        I, O = self.in_size, self.out_size
+        W_data = np.random.randn(I, O).astype(self.dtype) * np.sqrt(1 / I)
+        self.W.data = W_data
+
+    def forward(self, x):
+        if self.W.data is None:
+            self.in_size = x.shape[1]
+            self._init_W()
+
+        y = F.linear(x, self.W, self.b)
+        return y
