@@ -224,7 +224,6 @@ class MeanSquaredError(Function):
 
     def backward(self, gy):
         x0, x1 = self.inputs
-        gy = broadcast_to(gy, x0.shape)
         gx0 = gy * (x0 - x1) * (2.0 / len(x0))
         gx1 = -gx0
         return gx0, gx1
