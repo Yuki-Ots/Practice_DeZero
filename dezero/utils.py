@@ -1,7 +1,10 @@
-from dezero import Variable
-from dezero import Function
 import os
 import subprocess
+import urllib.request
+import numpy as np
+from dezero import as_variable
+from dezero import Variable
+from dezero import cuda
 
 def _dot_var(v, verbose=False):
     dot_var = '{} [label="{}", color=orange, style=filled]\n'
@@ -108,7 +111,8 @@ def pair(x):
         assert len(x) == 2
         return x
     else:
-        raise ValueErrordef get_file(url, file_name=None):
+        raise ValueError
+def get_file(url, file_name=None):
     """Download a file from the `url` if it is not in the cache.
 
     The file at the `url` is downloaded to the `~/.dezero`.

@@ -1,5 +1,6 @@
 import tarfile
 import pickle
+import gzip
 import numpy as np
 import matplotlib.pyplot as plt
 from dezero.utils import get_file, cache_dir
