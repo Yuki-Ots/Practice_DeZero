@@ -65,6 +65,11 @@ class Spiral(Dataset):
         self.data, self.label = get_spiral(self.train)
 
 
+class Hoge(Dataset):
+    def prepare(self):
+        pass
+
+
 class MNIST(Dataset):
 
     def __init__(self, train=True,
