@@ -63,6 +63,7 @@ class Spiral(Dataset):
     def prepare(self):
         self.data, self.label = get_spiral(self.train)
 
+
 class MNIST(Dataset):
 
     def __init__(self, train=True,
