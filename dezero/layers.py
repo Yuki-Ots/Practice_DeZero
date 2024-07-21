@@ -1,4 +1,4 @@
-from dezero.core import Parameter
+from dezero import Parameter, cuda
 import weakref
 import dezero.functions as F
 import numpy as np
@@ -59,7 +59,7 @@ class Linear(Layer):
         else:
             self.b = Parameter(np.zeros(out_size), name='b')
 
-    def _init_W(self):
+    def _init_W(self, xp=np):
         I, O = self.in_size, self.out_size
         W_data = np.random.randn(I, O).astype(self.dtype) * np.sqrt(1 / I)
         self.W.data = W_data
@@ -67,7 +67,8 @@ class Linear(Layer):
     def forward(self, x):
         if self.W.data is None:
             self.in_size = x.shape[1]
-            self._init_W()
+            xp = cuda.get_array_module(x)
+            self._init_W(xp)
 
         y = F.linear(x, self.W, self.b)
         return y

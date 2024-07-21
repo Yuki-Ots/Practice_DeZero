@@ -1,6 +1,7 @@
 import numpy as np
 import dezero
 import math
+import dezero.cuda
 
 
 class Optimizer:
@@ -48,7 +49,8 @@ class Momentum(Optimizer):
     def update_one(self, param):
         v_key = id(param)
         if v_key not in self.vs:
-            self.vs[v_key] = np.zeros(param.data.shape)
+            xp = dezero.cuda.get_array_module(param.data)
+            self.vs[v_key] = xp.zeros(param.data.shape)
         v = self.vs[v_key]
         v *= self.momentum
         v -= self.lr * param.grad.data
@@ -74,15 +76,16 @@ class Adam(Optimizer):
 
     def update_one(self, param):
         key = id(param)
+        xp = dezero.cuda.get_array_module(param.data)
         if key not in self.ms:
-            self.ms[key] = np.zeros_like(param.data)
-            self.vs[key] = np.zeros_like(param.data)
+            self.ms[key] = xp.zeros_like(param.data)
+            self.vs[key] = xp.zeros_like(param.data)
 
-        lr = self.alpha * np.sqrt(1 - self.beta2 ** self.t) / (1 - self.beta1 ** self.t)
+        lr = self.alpha * xp.sqrt(1 - self.beta2 ** self.t) / (1 - self.beta1 ** self.t)
         m = self.beta1 * self.ms[key] + (1 - self.beta1) * param.grad.data
         v = self.beta2 * self.vs[key] + (1 - self.beta2) * param.grad.data ** 2
 
-        param.data -= lr * m / (np.sqrt(v) + self.epsilon)
+        param.data -= lr * m / (xp.sqrt(v) + self.epsilon)
         self.ms[key], self.vs[key] = m, v
 
 
