@@ -2,10 +2,12 @@ import dezero
 from dezero import Variable, Function, as_variable, no_grad
 from dezero import utils
 import numpy as np
+from dezero import cuda
 
 class Exp(Function):
     def forward(self, x):
-        y = np.exp(x)
+        xp = cuda.get_array_module(x)
+        y = xp.exp(x)
         return y
     def backward(self, gy):
         x, = self.inputs
@@ -19,11 +21,12 @@ def exp(x):
 
 class Sqrt(Function):
     def forward(self, x):
-        y = np.sqrt(x)
+        xp = cuda.get_array_module(x)
+        y = xp.sqrt(x)
         return y
     def backward(self, gy):
         x, = self.inputs[0]
-        gx = gy / (2 * np.sqrt(x))
+        gx = gy / (2 * sqrt(x))
         return gx
 
 
@@ -33,7 +36,8 @@ def sqrt(x):
 
 class Sin(Function):
     def forward(self, x):
-        y = np.sin(x)
+        xp = cuda.get_array_module(x)
+        y = xp.sin(x)
         return y
     def backward(self, gy):
         x, = self.inputs
@@ -47,7 +51,8 @@ def sin(x):
 
 class Cos(Function):
     def forward(self, x):
-        y = np.cos(x)
+        xp = cuda.get_array_module(x)
+        y = xp.cos(x)
         return y
     def backward(self, gy):
         x, = self.inputs
@@ -61,7 +66,8 @@ def cos(x):
 
 class Tan(Function):
     def forward(self, x):
-        y = np.tan(x)
+        xp = cuda.get_array_module(x)
+        y = xp.tan(x)
         return y
     def backward(self, gy):
         y = self.outputs[0]()
@@ -73,8 +79,9 @@ def tan(x):
 
 class Tanh(Function):
     def forward(self, x):
-        ex = np.exp(x)
-        emx = np.exp(-x)
+        xp = cuda.get_array_module(x)
+        ex = xp.exp(x)
+        emx = xp.exp(-x)
         y = (ex - emx) / (ex + emx)
         return y
     def backward(self, gy):
@@ -88,7 +95,8 @@ def tanh(x):
 
 class Log(Function):
     def forward(self, x):
-        y = np.log(x)
+        xp = cuda.get_array_module(x)
+        y = xp.log(x)
         return y
 
     def backward(self, gy):
@@ -168,7 +176,8 @@ class BroadcastTo(Function):
 
     def forward(self, x):
         self.x_shape = x.shape
-        y = np.broadcast_to(x, self.shape)
+        xp = cuda.get_array_module(x)
+        y = xp.broadcast_to(x, self.shape)
         return y
 
     def backward(self, gy):
@@ -220,7 +229,8 @@ def matmul(x, W):
 class MeanSquaredError(Function):
     def forward(self, x0, x1):
         diff = x0 - x1
-        return np.sum(diff ** 2) / len(diff)
+        xp = cuda.get_array_module(x0)
+        return xp.sum(diff ** 2) / len(diff)
 
     def backward(self, gy):
         x0, x1 = self.inputs
@@ -235,10 +245,11 @@ def mean_squared_error(x0, x1):
 
 class Linear(Function):
     def forward(self, x, W, b):
+        xp = cuda.get_array_module(x)
         if b is None:
-            y = np.matmul(x, W)
+            y = xp.matmul(x, W)
         else:
-            y = np.matmul(x, W) + b
+            y = xp.matmul(x, W) + b
         return y
 
     def backward(self, gy):
@@ -255,7 +266,8 @@ def linear(x, W, b=None):
 
 class Sigmoid(Function):
     def forward(self, x):
-        y = 1. / (1. + np.exp(-x))
+        xp = cuda.get_array_module(x)
+        y = 1. / (1. + xp.exp(-x))
         return y
     def backward(self, gy):
         y = self.outputs[0]()
@@ -285,8 +297,7 @@ class GetItemGrad(Function):
         self.in_shape = in_shape
 
     def forward(self, gy):
-        # xp = dezero.cuda.get_array_module(gy)
-        xp = np
+        xp = dezero.cuda.get_array_module(gy)
         gx = xp.zeros(self.in_shape, dtype=gy.dtype)
 
         if xp is np:
@@ -305,25 +316,38 @@ def get_item(x, slices):
 
 
 class ReLU(Function):
-    def __init__(self):
-        self.mask = None
     def forward(self, x):
-        self.mask = (x <= 0)
-        y = x.copy()
-        y[self.mask] = 0.0
+        xp = cuda.get_array_module(x)
+        y = xp.maximum(x, 0.0)
         return y
 
     def backward(self, gy):
-        gx = (~self.mask).astype(np.float32) * gy
+        x, = self.inputs
+        mask = x.data > 0
+        gx = gy * mask
         return gx
+
+# class ReLU(Function):
+#     def __init__(self):
+#         self.mask = None
+#     def forward(self, x):
+#         self.mask = (x <= 0)
+#         y = x.copy()
+#         y[self.mask] = 0.0
+#         return y
+#
+#     def backward(self, gy):
+#         gx = (~self.mask).astype(np.float32) * gy
+#         return gx
 
 def relu(x):
     return ReLU()(x)
 
 
 def numerical_grad(f, x:Variable, eps=1e-6):
+    xp = cuda.get_array_module(x)
     h = eps
-    it = np.nditer(x.data, flags=['multi_index'])
+    it = xp.nditer(x.data, flags=['multi_index'])
 
     with no_grad():
         x = Variable(x.data.astype(np.float64))
@@ -418,3 +442,55 @@ class Clip(Function):
 
 def clip(x, x_min, x_max):
     return Clip(x_min, x_max)(x)
+
+
+class SoftmaxCrossEntropy(Function):
+    def __init__(self, axis=1, p_min=1e-15, p_max=1):
+        self.axis = axis
+        self.mask_clip = None
+        self.y = None
+        # self.p_min = p_min
+        # self.p_max = p_max
+    def forward(self, x, t):
+        axis = self.axis
+        xp = cuda.get_array_module(x)
+        N = x.shape[0]
+        x = x - xp.max(x, axis=axis, keepdims=True)
+        exp_x = xp.exp(x)
+        y = exp_x / xp.sum(exp_x, axis=axis, keepdims=True)
+        # self.mask_clip = (y >= self.p_min) * (y <= self.p_max)
+        # y = xp.clip(y, 1e-15, 1.0)
+        tlogy = xp.log(y[np.arange(N), t.ravel()])
+        loss = - xp.sum(tlogy) / np.float32(N)
+        return loss
+
+    def backward(self, gy):
+        x, t = self.inputs
+        N, COL = x.shape
+        gy *= 1 / N
+        xp = cuda.get_array_module(t.data)
+        eigen = xp.eye(COL, dtype=t.dtype)
+        t_one_hot = eigen[t.data]
+        y = softmax(x)
+        gx = gy * (y - t_one_hot)
+        return gx
+
+
+def softmax_cross_entropy(x, t, axis=1):
+    return SoftmaxCrossEntropy(axis)(x, t)
+
+
+def accuracy(y_pred, target):
+    y_pred, target = as_variable(y_pred), as_variable(target)
+    y = y_pred.data.argmax(axis=-1).reshape(target.shape)
+    result = (y == target.data)
+    acc = result.mean()
+    return Variable(np.array(acc))
+
+def average(x, axis=None, keepdims=False):
+    x = as_variable(x)
+    y = sum(x, axis, keepdims)
+    return y * (y.data.size / x.data.size)
+
+def mean(x, axis=None, keepdims=False):
+    return average(x, axis, keepdims)
