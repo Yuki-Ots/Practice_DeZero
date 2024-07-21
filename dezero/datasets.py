@@ -59,6 +59,7 @@ def get_spiral(train=True):
     t = t[indices]
     return x, t
 
+
 class Spiral(Dataset):
     def prepare(self):
         self.data, self.label = get_spiral(self.train)
