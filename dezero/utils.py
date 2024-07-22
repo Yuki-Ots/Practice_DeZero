@@ -6,6 +6,8 @@ from dezero import as_variable
 from dezero import Variable
 from dezero import cuda
 
+
+
 def _dot_var(v, verbose=False):
     dot_var = '{} [label="{}", color=orange, style=filled]\n'
 
@@ -137,7 +139,7 @@ def get_file(url, file_name=None):
 
     print("Downloading: " + file_name)
     try:
-        urllib.request.urlretrieve(url, file_path, show_progress)
+        urllib.request.urlretrieve(url, file_path, show_progress_viz)
     except (Exception, KeyboardInterrupt) as e:
         if os.path.exists(file_path):
             os.remove(file_path)
@@ -150,7 +152,6 @@ cache_dir = os.path.join(os.path.expanduser('~'), '.dezero')
 
 def show_progress(block_num, block_size, total_size):
     bar_template = "\r[{}] {:.2f}%"
-
     downloaded = block_num * block_size
     p = downloaded / total_size * 100
     i = int(downloaded / total_size * 30)
@@ -158,3 +159,21 @@ def show_progress(block_num, block_size, total_size):
     if i >= 30: i = 30
     bar = "#" * i + "." * (30 - i)
     print(bar_template.format(bar, p), end='')
+
+pbar=None
+try:
+    import tqdm
+    def show_progress_viz(block_num, block_size, total_size):
+        global pbar
+        if pbar is None:
+            pbar = tqdm.tqdm(total=total_size)
+        else:
+            size = block_size * block_num
+            pbar.update(size)
+            pbar.refresh()
+
+
+            if pbar.total == total_size:
+                pbar = None
+except ImportError:
+    show_progress_viz = show_progress

@@ -44,7 +44,8 @@ class MNIST(Dataset):
         super().__init__(train, transform, target_transform)
 
     def prepare(self):
-        url = 'http://yann.lecun.com/exdb/mnist/'
+        url = 'https://ossci-datasets.s3.amazonaws.com/mnist/'
+        # url = 'http://yann.lecun.com/exdb/mnist/'
         train_files = {'target': 'train-images-idx3-ubyte.gz',
                        'label': 'train-labels-idx1-ubyte.gz'}
         test_files = {'target': 't10k-images-idx3-ubyte.gz',
@@ -112,11 +113,6 @@ def get_spiral(train=True):
 class Spiral(Dataset):
     def prepare(self):
         self.data, self.label = get_spiral(self.train)
-
-
-class Hoge(Dataset):
-    def prepare(self):
-        pass
 
 
 #
