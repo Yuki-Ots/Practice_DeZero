@@ -95,7 +95,7 @@ def reshape_sum_backward(gy, x_shape, axis, keepdims):
 
     if not (ndim == 0 or tupled_axis is None or keepdims):
         actual_axis = [a if a >= 0 else a + ndim for a in tupled_axis]
-        shape = list(gy.shape)F
+        shape = list(gy.shape)
         for a in sorted(actual_axis):
             shape.insert(a, 1)
     else:
