@@ -448,41 +448,61 @@ class Clip(Function):
 def clip(x, x_min, x_max):
     return Clip(x_min, x_max)(x)
 
-
 class SoftmaxCrossEntropy(Function):
-    def __init__(self, axis=1, p_min=1e-15, p_max=1):
-        self.axis = axis
-        self.mask_clip = None
-        self.y = None
-        # self.p_min = p_min
-        # self.p_max = p_max
     def forward(self, x, t):
-        axis = self.axis
-        xp = cuda.get_array_module(x)
         N = x.shape[0]
-        x = x - xp.max(x, axis=axis, keepdims=True)
-        exp_x = xp.exp(x)
-        y = exp_x / xp.sum(exp_x, axis=axis, keepdims=True)
-        # self.mask_clip = (y >= self.p_min) * (y <= self.p_max)
-        # y = xp.clip(y, 1e-15, 1.0)
-        tlogy = xp.log(y[np.arange(N), t.ravel()])
-        loss = - xp.sum(tlogy) / np.float32(N)
-        return loss
+        log_z = utils.logsumexp(x, axis=1)
+        log_p = x - log_z
+        log_p = log_p[np.arange(N), t.ravel()]
+        y = -log_p.sum() / np.float32(N)
+        return y
 
     def backward(self, gy):
         x, t = self.inputs
-        N, COL = x.shape
-        gy *= 1 / N
-        xp = cuda.get_array_module(t.data)
-        eigen = xp.eye(COL, dtype=t.dtype)
-        t_one_hot = eigen[t.data]
+        N, CLS_NUM = x.shape
+
+        gy *= 1/N
         y = softmax(x)
-        gx = gy * (y - t_one_hot)
-        return gx
+        # convert to one-hot
+        xp = cuda.get_array_module(t.data)
+        t_onehot = xp.eye(CLS_NUM, dtype=t.dtype)[t.data]
+        y = (y - t_onehot) * gy
+        return y
+#
+# class SoftmaxCrossEntropy(Function):
+#     def __init__(self, axis=1, p_min=1e-15, p_max=1):
+#         self.axis = axis
+#         self.mask_clip = None
+#         self.y = None
+#         # self.p_min = p_min
+#         # self.p_max = p_max
+#     def forward(self, x, t):
+#         axis = self.axis
+#         xp = cuda.get_array_module(x)
+#         N = x.shape[0]
+#         x = x - xp.max(x, axis=axis, keepdims=True)
+#         exp_x = xp.exp(x)
+#         y = exp_x / xp.sum(exp_x, axis=axis, keepdims=True)
+#         # self.mask_clip = (y >= self.p_min) * (y <= self.p_max)
+#         # y = xp.clip(y, 1e-15, 1.0)
+#         tlogy = xp.log(y[np.arange(N), t.ravel()])
+#         loss = - xp.sum(tlogy) / np.float32(N)
+#         return loss
+#
+#     def backward(self, gy):
+#         x, t = self.inputs
+#         N, COL = x.shape
+#         gy *= 1 / N
+#         xp = cuda.get_array_module(t.data)
+#         eigen = xp.eye(COL, dtype=t.dtype)
+#         t_one_hot = eigen[t.data]
+#         y = softmax(x)
+#         gx = gy * (y - t_one_hot)
+#         return gx
 
 
-def softmax_cross_entropy(x, t, axis=1):
-    return SoftmaxCrossEntropy(axis)(x, t)
+def softmax_cross_entropy(x, t):
+    return SoftmaxCrossEntropy()(x, t)
 
 
 def accuracy(y_pred, target):
