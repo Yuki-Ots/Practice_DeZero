@@ -21,6 +21,7 @@ else:
     from dezero.layers import Layer
     from dezero.models import Model
     from dezero.dataloaders import DataLoader
+    from dezero.datasets import Dataset
 
 
     import dezero.functions
@@ -28,6 +29,7 @@ else:
     import dezero.layers
     import dezero.datasets
     import dezero.cuda
+    import dezero.transforms
 
 
     # from dezero.core import setup_variable
