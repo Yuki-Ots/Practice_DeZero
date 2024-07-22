@@ -30,6 +30,6 @@ def as_cupy(x):
     if isinstance(x, Variable):
         x = x.data
 
-        if not gpu_enable:
-            raise Exception('CuPy cannot be loaded. Please install Cupy')
-        return cp.asarray(x)
+    if not gpu_enable:
+        raise Exception('CuPy cannot be loaded. Please install Cupy')
+    return cp.asarray(x)
