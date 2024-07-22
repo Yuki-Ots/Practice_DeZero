@@ -1,4 +1,5 @@
-from dezero import Parameter, cuda
+from dezero import cuda
+from dezero.core import Parameter
 import weakref
 import dezero.functions as F
 import numpy as np
@@ -29,7 +30,7 @@ class Layer:
             if isinstance(value, Layer):
                 yield from value.params()
             else:
-                yield self.__dict__[name]
+                yield value
 
     def cleargrads(self):
         for param in self.params():
@@ -61,7 +62,7 @@ class Linear(Layer):
 
     def _init_W(self, xp=np):
         I, O = self.in_size, self.out_size
-        W_data = np.random.randn(I, O).astype(self.dtype) * np.sqrt(1 / I)
+        W_data = xp.random.randn(I, O).astype(self.dtype) * np.sqrt(1 / I)
         self.W.data = W_data
 
     def forward(self, x):

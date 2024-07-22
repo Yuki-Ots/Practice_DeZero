@@ -245,12 +245,17 @@ def mean_squared_error(x0, x1):
 
 class Linear(Function):
     def forward(self, x, W, b):
-        xp = cuda.get_array_module(x)
-        if b is None:
-            y = xp.matmul(x, W)
-        else:
-            y = xp.matmul(x, W) + b
+        y = x.dot(W)
+        if b is not None:
+            y += b
         return y
+    # def forward(self, x, W, b):
+    #     xp = cuda.get_array_module(x)
+    #     if b is None:
+    #         y = xp.matmul(x, W)
+    #     else:
+    #         y = xp.matmul(x, W) + b
+    #     return y
 
     def backward(self, gy):
         x, W, b = self.inputs
