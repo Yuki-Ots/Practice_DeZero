@@ -95,7 +95,7 @@ def reshape_sum_backward(gy, x_shape, axis, keepdims):
 
     if not (ndim == 0 or tupled_axis is None or keepdims):
         actual_axis = [a if a >= 0 else a + ndim for a in tupled_axis]
-        shape = list(gy.shape)
+        shape = list(gy.shape)F
         for a in sorted(actual_axis):
             shape.insert(a, 1)
     else:
@@ -147,3 +147,14 @@ def get_file(url, file_name=None):
     return file_path
 
 cache_dir = os.path.join(os.path.expanduser('~'), '.dezero')
+
+def show_progress(block_num, block_size, total_size):
+    bar_template = "\r[{}] {:.2f}%"
+
+    downloaded = block_num * block_size
+    p = downloaded / total_size * 100
+    i = int(downloaded / total_size * 30)
+    if p >= 100.0: p = 100.0
+    if i >= 30: i = 30
+    bar = "#" * i + "." * (30 - i)
+    print(bar_template.format(bar, p), end='')
