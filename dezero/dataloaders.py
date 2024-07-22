@@ -24,7 +24,7 @@ class DataLoader:
         return self
 
     def __next__(self):
-        if self.index >= self.max_iter:
+        if self.iteration >= self.max_iter:
             self.reset()
             raise StopIteration
         i, batch_size = self.iteration, self.batch_size
