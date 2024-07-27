@@ -55,12 +55,13 @@ for epoch in tqdm.tqdm(range(max_epoch)):
     count = 0
     for x, t in dataloader:
         count += 1
-        print(count)
         x = x.reshape(batch_size, 1, 28, 28)
         y = model(x)
         loss = F.softmax_cross_entropy(y, t)
         model.cleargrads()
         loss.backward()
+        for param in model.params():
+            print(param.shape, param.grad.shape, param.shape == param.grad.shape)
         optimizer.update()
         sum_loss += loss.data
 
@@ -70,3 +71,17 @@ for epoch in tqdm.tqdm(range(max_epoch)):
 file_path = 'cnn_mnist.npz'
 if os.path.exists(file_path):
     model.load_weights(file_path)
+
+
+test_set = datasets.MNIST(train=False)
+test_data = DataLoader(test_set, batch_size)
+
+with dezero.test_mode():
+    accuracy = 0.0
+    for test_x, test_t in test_data:
+        test_x = np.reshape(test_x, (batch_size, 1, 28, 28))
+        y_hat = model(test_x)
+        y_hat = F.softmax(y_hat, axis=0)
+        t_hat = np.argmax(y_hat.data)
+        accuracy += (t_hat == y_hat)
+    print(f'accuracy={accuracy / len(test_set)}')

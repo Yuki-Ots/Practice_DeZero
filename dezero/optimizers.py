@@ -3,7 +3,6 @@ import dezero
 import math
 import dezero.cuda
 
-
 class Optimizer:
     def __init__(self):
         self.target = None
@@ -16,7 +15,6 @@ class Optimizer:
     def update(self):
         params = [p for p in self.target.params() if p.grad is not None]
 
-        # 前処理
         for f in self.hooks:
             f(params)
 
@@ -26,8 +24,32 @@ class Optimizer:
     def update_one(self, param):
         raise NotImplementedError()
 
-    def add_hook(self, hook):
-        self.hooks.append(hook)
+    def add_hook(self, f):
+        self.hooks.append(f)
+# class Optimizer:
+#     def __init__(self):
+#         self.target = None
+#         self.hooks = []
+#
+#     def setup(self, target):
+#         self.target = target
+#         return self
+#
+#     def update(self):
+#         params = [p for p in self.target.params() if p.grad is not None]
+#
+#         # 前処理
+#         for f in self.hooks:
+#             f(params)
+#
+#         for param in params:
+#             self.update_one(param)
+#
+#     def update_one(self, param):
+#         raise NotImplementedError()
+#
+#     def add_hook(self, hook):
+#         self.hooks.append(hook)
 
 
 class SGD(Optimizer):
@@ -51,12 +73,29 @@ class Momentum(Optimizer):
         if v_key not in self.vs:
             xp = dezero.cuda.get_array_module(param.data)
             self.vs[v_key] = xp.zeros(param.data.shape)
+
         v = self.vs[v_key]
         v *= self.momentum
         v -= self.lr * param.grad.data
         param.data += v
 
+class MomentumSGD(Optimizer):
+    def __init__(self, lr=0.01, momentum=0.9):
+        super().__init__()
+        self.lr = lr
+        self.momentum = momentum
+        self.vs = {}
 
+    def update_one(self, param):
+        v_key = id(param)
+        if v_key not in self.vs:
+            xp = dezero.cuda.get_array_module(param.data)
+            self.vs[v_key] = xp.zeros_like(param.data)
+
+        v = self.vs[v_key]
+        v *= self.momentum
+        v -= self.lr * param.grad.data
+        param.data += v
 
 class Adam(Optimizer):
     """Adam optimizer"""
