@@ -214,7 +214,7 @@ class Linear(Layer):
             xp = cuda.get_array_module(x)
             self.in_size = x.shape[1]
             self._init_W(xp)
-        if cuda.gpu_enable:
+        if (not self.no_bias) and cuda.gpu_enable:
             self.b.to_gpu()
 
 
@@ -237,7 +237,10 @@ class Conv2d(Layer):
         if in_channels is not None:
             self._init_W()
         self.nobias = nobias
-        self.b = None
+        if nobias:
+            self.b = None
+        else:
+            self.b = Parameter(np.zeros(out_channels, dtype=dtype), name='b')
 
     def _init_W(self, xp=np):
         C, OC = self.in_channels, self.out_channels
@@ -246,8 +249,6 @@ class Conv2d(Layer):
         W_data = xp.random.randn(OC, C, KH, KW).astype(self.dtype) * scale
         self.W.data = W_data
 
-    def _init_b(self, xp=np):
-        self.b = Parameter(xp.zeros(self.out_channels), name='b')
 
     def forward(self, x):
         if self.W.data is None:
@@ -255,9 +256,8 @@ class Conv2d(Layer):
             xp = cuda.get_array_module(x)
             self._init_W(xp)
 
-        if not self.nobias:
-            xp = cuda.get_array_module(x)
-            self._init_b(xp)
+        if (not self.nobias) and cuda.gpu_enable:
+            self.b.to_gpu()
 
         y = F.conv2d(x, self.W, self.b, self.stride, self.pad)
         return y
