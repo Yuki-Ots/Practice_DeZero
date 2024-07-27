@@ -75,25 +75,33 @@ class Linear(Layer):
         self.in_size = in_size
         self.out_size = out_size
         self.dtype = dtype
+        self.b = None
         self.W = Parameter(None, name='W')
         if self.in_size is not None:
             self._init_W()
 
-        if no_bias:
-            self.b = None
-        else:
-            self.b = Parameter(np.zeros(out_size), name='b')
+        self.no_bias = no_bias
+        # if no_bias:
+        #     self.b = None
+        # else:
+        #     self.b = Parameter(np.zeros(out_size), name='b')
 
     def _init_W(self, xp=np):
         I, O = self.in_size, self.out_size
         W_data = xp.random.randn(I, O).astype(self.dtype) * np.sqrt(1 / I)
         self.W.data = W_data
 
+    def _init_b(self, xp=np):
+        self.b = Parameter(xp.zeros(self.out_size), name='b')
+
     def forward(self, x):
         if self.W.data is None:
             self.in_size = x.shape[1]
             xp = cuda.get_array_module(x)
             self._init_W(xp)
+        if not self.no_bias:
+            xp = cuda.get_array_module(x)
+            self._init_b(xp)
 
         y = F.linear(x, self.W, self.b)
         return y
@@ -114,6 +122,7 @@ class Conv2d(Layer):
         if in_channels is not None:
             self._init_W()
         self.nobias = nobias
+        self.b = None
 
     def _init_W(self, xp=np):
         C, OC = self.in_channels, self.out_channels
@@ -132,6 +141,7 @@ class Conv2d(Layer):
             self._init_W(xp)
 
         if not self.nobias:
+            xp = cuda.get_array_module(x)
             self._init_b(xp)
 
         y = F.conv2d(x, self.W, self.b, self.stride, self.pad)
