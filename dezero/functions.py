@@ -5,11 +5,13 @@ import numpy as np
 from dezero import cuda
 from dezero.utils import pair
 
+
 class Exp(Function):
     def forward(self, x):
         xp = cuda.get_array_module(x)
         y = xp.exp(x)
         return y
+
     def backward(self, gy):
         x, = self.inputs
         gx = exp(x) * gy
@@ -25,6 +27,7 @@ class Sqrt(Function):
         xp = cuda.get_array_module(x)
         y = xp.sqrt(x)
         return y
+
     def backward(self, gy):
         x, = self.inputs[0]
         gx = gy / (2 * sqrt(x))
@@ -40,6 +43,7 @@ class Sin(Function):
         xp = cuda.get_array_module(x)
         y = xp.sin(x)
         return y
+
     def backward(self, gy):
         x, = self.inputs
         gx = gy * cos(x)
@@ -55,6 +59,7 @@ class Cos(Function):
         xp = cuda.get_array_module(x)
         y = xp.cos(x)
         return y
+
     def backward(self, gy):
         x, = self.inputs
         gx = - gy * sin(x)
@@ -70,6 +75,7 @@ class Tan(Function):
         xp = cuda.get_array_module(x)
         y = xp.tan(x)
         return y
+
     def backward(self, gy):
         y = self.outputs[0]()
         gx = gy * (1 + y ** 2)
@@ -78,6 +84,7 @@ class Tan(Function):
 def tan(x):
     return Tan()(x)
 
+
 class Tanh(Function):
     def forward(self, x):
         xp = cuda.get_array_module(x)
@@ -85,6 +92,7 @@ class Tanh(Function):
         emx = xp.exp(-x)
         y = (ex - emx) / (ex + emx)
         return y
+
     def backward(self, gy):
         y = self.outputs[0]()
         gx = gy * (1 - y ** 2)
@@ -104,6 +112,7 @@ class Log(Function):
         x = self.inputs[0]
         return gy / x
 
+
 def log(x):
     return Log()(x)
 
@@ -116,7 +125,6 @@ class ReShape(Function):
         self.x_shape = x.shape  # backwardの時のためにxの元のshapeを保持しておく。
         y = x.reshape(self.shape)
         return y
-
 
     def backward(self, gy):
         gx = reshape(gy, self.x_shape)
@@ -168,7 +176,6 @@ class Sum(Function):
 
 def sum(x, axis=None, keepdims=False):
     return Sum(axis, keepdims)(x)
-
 
 
 class BroadcastTo(Function):
@@ -223,6 +230,7 @@ class MatMul(Function):
         gW = matmul(x.T, gy)
         return gx, gW
 
+
 def matmul(x, W):
     return MatMul()(x, W)
 
@@ -250,6 +258,7 @@ class Linear(Function):
         if b is not None:
             y += b
         return y
+
     # def forward(self, x, W, b):
     #     xp = cuda.get_array_module(x)
     #     if b is None:
@@ -275,6 +284,7 @@ class Sigmoid(Function):
         xp = cuda.get_array_module(x)
         y = 1. / (1. + xp.exp(-x))
         return y
+
     def backward(self, gy):
         y = self.outputs[0]()
         return gy * y * (1. - y)
@@ -282,6 +292,7 @@ class Sigmoid(Function):
 
 def sigmoid(x):
     return Sigmoid()(x)
+
 
 class GetItem(Function):
     def __init__(self, slices):
@@ -332,6 +343,7 @@ class ReLU(Function):
         gx = gy * mask
         return gx
 
+
 # class ReLU(Function):
 #     def __init__(self):
 #         self.mask = None
@@ -349,7 +361,7 @@ def relu(x):
     return ReLU()(x)
 
 
-def numerical_grad(f, x:Variable, eps=1e-6):
+def numerical_grad(f, x: Variable, eps=1e-6):
     xp = cuda.get_array_module(x)
     h = eps
     it = xp.nditer(x.data, flags=['multi_index'])
@@ -413,6 +425,7 @@ class Softmax(Function):
         gx -= y * sumdx
         return gx
 
+
 def softmax(x, axis=-1):
     return Softmax()(x)
 
@@ -448,6 +461,7 @@ class Clip(Function):
 def clip(x, x_min, x_max):
     return Clip(x_min, x_max)(x)
 
+
 class SoftmaxCrossEntropy(Function):
     def forward(self, x, t):
         N = x.shape[0]
@@ -461,13 +475,15 @@ class SoftmaxCrossEntropy(Function):
         x, t = self.inputs
         N, CLS_NUM = x.shape
 
-        gy *= 1/N
+        gy *= 1 / N
         y = softmax(x)
         # convert to one-hot
         xp = cuda.get_array_module(t.data)
         t_onehot = xp.eye(CLS_NUM, dtype=t.dtype)[t.data]
         y = (y - t_onehot) * gy
         return y
+
+
 #
 # class SoftmaxCrossEntropy(Function):
 #     def __init__(self, axis=1, p_min=1e-15, p_max=1):
@@ -512,10 +528,12 @@ def accuracy(y_pred, target):
     acc = result.mean()
     return Variable(np.array(acc))
 
+
 def average(x, axis=None, keepdims=False):
     x = as_variable(x)
     y = sum(x, axis, keepdims)
     return y * (y.data.size / x.data.size)
+
 
 def mean(x, axis=None, keepdims=False):
     return average(x, axis, keepdims)
@@ -531,17 +549,20 @@ def dropout(x, dropout_ratio=0.5):
     y = x * mask / scale
     return y
 
+
 def get_conv_outsize(input_size, kernel_size, stride, pad):
     return (input_size + pad * 2 - kernel_size) // stride + 1
 
 
-def _im2col_array(x, fil_size, y_size, stride, pad):
+# 現状ではstrideやpadが異なる場合は対応していない。
+def _im2col_array(x, fil_size, stride, pad):
     xp = cuda.get_array_module(x)
     x_b, x_c, x_h, x_w = x.shape
     fil_h, fil_w = pair(fil_size)
-    y_h, y_w = pair(y_size)
     stride, _ = pair(stride)
     pad, _ = pair(pad)
+    y_h = get_conv_outsize(x_h, fil_h, stride, pad)
+    y_w = get_conv_outsize(x_w, fil_w, stride, pad)
     index = -1
 
     x_pad = xp.pad(x, [(0, 0), (0, 0), (pad, pad), (pad, pad)], "constant")
@@ -554,16 +575,17 @@ def _im2col_array(x, fil_size, y_size, stride, pad):
             w2 = w + y_w * stride
             x_col[index, :, :, :, :] = x_pad[:, :, h:h2:stride, w:w2:stride]
     x_col = x_col.transpose(2, 0, 1, 3, 4).reshape(x_c * fil_h * fil_w, x_b * y_h * y_w)
-
     return x_col
 
-def _col2im_array(dx_col, x_shape, fil_size, y_size, stride, pad):
+
+def _col2im_array(dx_col, x_shape, fil_size, stride, pad):
     xp = cuda.get_array_module(dx_col)
     x_b, x_c, x_h, x_w = x_shape
     fil_h, fil_w = pair(fil_size)
-    y_h, y_w = pair(y_size)
     stride, _ = pair(stride)
     pad, _ = pair(pad)
+    y_h = get_conv_outsize(x_h, fil_h, stride, pad)
+    y_w = get_conv_outsize(x_w, fil_w, stride, pad)
     index = -1
 
     dx_col = dx_col.reshape(x_c, fil_h * fil_w, x_b, y_h, y_w).transpose(1, 2, 0, 3, 4)
@@ -578,40 +600,51 @@ def _col2im_array(dx_col, x_shape, fil_size, y_size, stride, pad):
 
     return dx[:, :, pad:x_h + pad, pad:x_w + pad]
 
+
 class _Im2col(Function):
-    def __init__(self, fil_size, y_size, stride, pad):
-        self.fil_size = fil_size
-        self.y_size = y_size
-        self.stride = stride
-        self.pad = pad
+    def __init__(self, fil_size, stride, pad):
+        self.fil_size = pair(fil_size)
+        self.y_size = None
+        self.input_size = None
+        self.stride = pair(stride)
+        self.pad = pair(pad)
+
     def forward(self, x):
         self.input_size = x.shape
-        return _im2col_array(x, self.fil_size, self.y_size, self.stride, self.pad)
+        y_h = get_conv_outsize(self.input_size[-2], self.fil_size[0], self.stride[0], self.pad[0])
+        y_w = get_conv_outsize(self.input_size[-1], self.fil_size[1], self.stride[1], self.pad[1])
+        self.y_size = (y_h, y_w)
+        return _im2col_array(x, self.fil_size, self.stride, self.pad)
 
     def backward(self, gy):
-        return _col2im(gy, self.input_size, self.fil_size, self.y_size, self.stride, self.pad)
+        return _col2im(gy, self.input_size, self.fil_size, self.stride, self.pad)
 
 
-def _im2col(x, fil_size, y_size, stride, pad):
-    return _Im2col(fil_size, y_size, stride, pad)(x)
+def _im2col(x, fil_size, stride, pad):
+    return _Im2col(fil_size, stride, pad)(x)
+
 
 class _Col2im(Function):
-    def __init__(self, input_size, fil_size, y_size, stride, pad):
+    def __init__(self, input_size, fil_size, stride, pad):
         self.input_size = input_size
-        self.fil_size = fil_size
-        self.y_size = y_size
-        self.stride = stride
-        self.pad = pad
+        self.fil_size = pair(fil_size)
+        self.stride = pair(stride)
+        self.pad = pair(pad)
+        y_h = get_conv_outsize(self.input_size[-2], self.fil_size[0], self.stride[0], self.pad[0])
+        y_w = get_conv_outsize(self.input_size[-1], self.fil_size[1], self.stride[1], self.pad[1])
+        self.y_size = (y_h, y_w)
 
     def forward(self, dx_col):
-        y = _col2im_array(dx_col, self.input_size, self.fil_size, self.y_size, self.stride, self.pad)
+        y = _col2im_array(dx_col, self.input_size, self.fil_size, self.stride, self.pad)
         return y
 
     def backward(self, gy):
-        return _im2col(gy, self.fil_size, self.y_size, self.stride, self.pad)
+        return _im2col(gy, self.fil_size, self.stride, self.pad)
 
-def _col2im(x, input_size, kernel_size, y_size, stride, pad):
-    return _Col2im(input_size, kernel_size, y_size, stride, pad)(x)
+
+def _col2im(x, input_size, kernel_size, stride, pad):
+    return _Col2im(input_size, kernel_size, stride, pad)(x)
+
 
 class Conv2d(Function):
     def __init__(self, stride, pad):
@@ -636,7 +669,7 @@ class Conv2d(Function):
         self.OH = OH
         self.OW = OW
         self.output_shape = N, OC, OH, OW
-        self.x_col = _im2col_array(x, (KH, KW), (OH, OW), self.stride, self.pad)
+        self.x_col = _im2col_array(x, (KH, KW), self.stride, self.pad)
         self.w_col = W.reshape(OC, C * KH * KW)
 
         if b is None:
@@ -647,13 +680,11 @@ class Conv2d(Function):
 
         return self.y
 
-
     def backward(self, gy):
         xp = cuda.get_array_module(gy)
         N, C, height, width = self.input_shape
         _, _, KH, KW = self.kernel_shape
         _, OC, OH, OW = self.output_shape
-        print(gy.transpose(0, 2, 3, 1).shape, N, OH, OW, OC)
         dy = gy.transpose(0, 2, 3, 1).reshape(N * OH * OW, OC)
         dw = matmul(self.x_col, dy)
 
@@ -661,14 +692,14 @@ class Conv2d(Function):
         self.db = sum(dy, axis=0)
 
         dx_col = matmul(dy, self.w_col)
-        self.dx = _col2im(dx_col.T, self.input_shape, (KH, KW), (OH, OW), self.stride, self.pad)
+        self.dx = _col2im(dx_col.T, self.input_shape, (KH, KW), self.stride, self.pad)
 
         return self.dx
 
 
-
 def conv2d(x, W, b=None, stride=1, pad=0):
     return Conv2d(stride, pad)(x, W, b)
+
 
 def conv2d_simple(x, W, b=None, stride=1, pad=0):
     x, W = as_variable(x), as_variable(W)
@@ -688,6 +719,7 @@ def conv2d_simple(x, W, b=None, stride=1, pad=0):
     return y
 
 
+
 def pooling_simple(x, kernel_size, stride=1, pad=0):
     x = as_variable(x)
 
@@ -697,12 +729,13 @@ def pooling_simple(x, kernel_size, stride=1, pad=0):
     SH, SW = pair(stride)
     OH = get_conv_outsize(H, KH, SH, PH)
     OW = get_conv_outsize(W, KW, SW, PW)
-
     col = _im2col(x, kernel_size, stride, pad)
-    col = col.reshape(-1, KH * KW)
+
+    col = col.T.reshape(-1, KH * KW)
     y = col.max(axis=1)
     y = y.reshape(N, OH, OW, C).transpose(0, 3, 1, 2)
     return y
+
 
 class Max(Function):
     def __init__(self, axis=None, keepdims=False):

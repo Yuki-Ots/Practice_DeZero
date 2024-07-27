@@ -161,6 +161,12 @@ class Variable:
         if self.data is not None:
             self.data = dezero.cuda.as_cupy(self.data)
 
+    def max(self, axis=None, keepdims=False):
+        return dezero.functions.max(self, axis, keepdims)
+
+    def min(self, axis=None, keepdims=False):
+        return dezero.functions.min(self, axis, keepdims)
+
 
 
 

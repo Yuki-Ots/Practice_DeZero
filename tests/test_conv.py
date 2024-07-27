@@ -55,9 +55,6 @@ class TestConv(unittest.TestCase):
         # 勾配確認
         grads = F.numerical_grad(conv, x)
         grads_summed = np.sum(grads, axis=(-1, -2, -3)).reshape(1, 1, input_size, input_size)
-        print(x.grad.data.shape)
-        print(grads_summed.shape)
-        print(x.grad.data)
         self.assertTrue(np.allclose(x.grad.data, grads_summed))
 
 
