@@ -113,11 +113,7 @@ class Conv2d(Layer):
         self.W = Parameter(None, name='W')
         if in_channels is not None:
             self._init_W()
-
-        if nobias:
-            self.b = None
-        else:
-            self.b = Parameter(np.zeros(out_channels, dtype=dtype), name='b')
+        self.nobias = nobias
 
     def _init_W(self, xp=np):
         C, OC = self.in_channels, self.out_channels
@@ -126,11 +122,17 @@ class Conv2d(Layer):
         W_data = xp.random.randn(OC, C, KH, KW).astype(self.dtype) * scale
         self.W.data = W_data
 
+    def _init_b(self, xp=np):
+        self.b = Parameter(xp.zeros(self.out_channels), name='b')
+
     def forward(self, x):
         if self.W.data is None:
             self.in_channels = x.shape[1]
             xp = cuda.get_array_module(x)
             self._init_W(xp)
+
+        if not self.nobias:
+            self._init_b(xp)
 
         y = F.conv2d(x, self.W, self.b, self.stride, self.pad)
         return y

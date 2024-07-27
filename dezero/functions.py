@@ -688,13 +688,13 @@ class Conv2d(Function):
         dy = gy.transpose(0, 2, 3, 1).reshape(N * OH * OW, OC)
         dw = matmul(self.x_col, dy)
 
-        self.dw = dw.T.reshape(OC, C, KH, KW)
-        self.db = sum(dy, axis=0)
+        dw = dw.T.reshape(OC, C, KH, KW)
+        db = sum(dy, axis=0)
 
         dx_col = matmul(dy, self.w_col)
-        self.dx = _col2im(dx_col.T, self.input_shape, (KH, KW), self.stride, self.pad)
+        dx = _col2im(dx_col.T, self.input_shape, (KH, KW), self.stride, self.pad)
 
-        return self.dx
+        return dx, dw, db
 
 
 def conv2d(x, W, b=None, stride=1, pad=0):
