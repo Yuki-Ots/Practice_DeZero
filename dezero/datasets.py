@@ -232,3 +232,55 @@ def save_cache_npz(data, label, filename, train=False):
         raise
     print(" Done")
     return filepath
+
+
+class CIFAR100(CIFAR10):
+
+    def __init__(self, train=True,
+                 transform=Compose([ToFloat(), Normalize(mean=0.5, std=0.5)]),
+                 target_transform=None,
+                 label_type='fine'):
+        assert label_type in ['fine', 'coarse']
+        self.label_type = label_type
+        super().__init__(train, transform, target_transform)
+
+    def prepare(self):
+        url = 'https://www.cs.toronto.edu/~kriz/cifar-100-python.tar.gz'
+        self.data, self.label = load_cache_npz(url, self.train)
+        if self.data is not None:
+            return
+
+        filepath = get_file(url)
+        if self.train:
+            self.data = self._load_data(filepath, 'train')
+            self.label = self._load_label(filepath, 'train')
+        else:
+            self.data = self._load_data(filepath, 'test')
+            self.label = self._load_label(filepath, 'test')
+        self.data = self.data.reshape(-1, 3, 32, 32)
+        save_cache_npz(self.data, self.label, url, self.train)
+
+    def _load_data(self, filename, data_type='train'):
+        with tarfile.open(filename, 'r:gz') as file:
+            for item in file.getmembers():
+                if data_type in item.name:
+                    data_dict = pickle.load(file.extractfile(item), encoding='bytes')
+                    data = data_dict[b'data']
+                    return data
+
+    def _load_label(self, filename, data_type='train'):
+        assert data_type in ['train', 'test']
+        with tarfile.open(filename, 'r:gz') as file:
+            for item in file.getmembers():
+                if data_type in item.name:
+                    data_dict = pickle.load(file.extractfile(item), encoding='bytes')
+                    if self.label_type == 'fine':
+                        return np.array(data_dict[b'fine_labels'])
+                    elif self.label_type == 'coarse':
+                        return np.array(data_dict[b'coarse_labels'])
+
+    @staticmethod
+    def labels(label_type='fine'):
+        coarse_labels = dict(enumerate(['aquatic mammals','fish','flowers','food containers','fruit and vegetables','household electrical device','household furniture','insects','large carnivores','large man-made outdoor things','large natural outdoor scenes','large omnivores and herbivores','medium-sized mammals','non-insect invertebrates','people','reptiles','small mammals','trees','vehicles 1','vehicles 2']))
+        fine_labels = []
+        return fine_labels if label_type is 'fine' else coarse_labels
