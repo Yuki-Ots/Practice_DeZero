@@ -1,1 +1,2 @@
 Step58相当分まで実装
+colab, vscodeなどで動かす場合はdezeroのpathを追加する必要あり
