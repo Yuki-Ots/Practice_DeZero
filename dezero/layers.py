@@ -26,6 +26,7 @@ class Layer:
 
     def forward(self, inputs):
         raise NotImplementedError()
+
     def params(self):
         for name in self._params:
             obj = self.__dict__[name]
@@ -58,7 +59,7 @@ class Layer:
     def _flatten_params(self, param_dict, parent_key=""):
         for name in self._params:
             value = self.__dict__[name]
-            key = parent_key +'/' +  name if parent_key else name
+            key = parent_key + '/' + name if parent_key else name
             if isinstance(value, Layer):
                 value._flatten_params(param_dict, key)
             else:
@@ -69,6 +70,7 @@ class Layer:
         param_dict = {}
         self._flatten_params(param_dict)
         array_dict = {key: param.data for key, param in param_dict.items()}
+
     def load_weights(self, path):
         npz = np.load(path)
         param_dict = {}
@@ -217,7 +219,6 @@ class Linear(Layer):
         if (not self.no_bias) and cuda.gpu_enable:
             self.b.to_gpu()
 
-
         y = F.linear(x, self.W, self.b)
         return y
 
@@ -249,7 +250,6 @@ class Conv2d(Layer):
         W_data = xp.random.randn(OC, C, KH, KW).astype(self.dtype) * scale
         self.W.data = W_data
 
-
     def forward(self, x):
         if self.W.data is None:
             self.in_channels = x.shape[1]
@@ -261,6 +261,25 @@ class Conv2d(Layer):
 
         y = F.conv2d(x, self.W, self.b, self.stride, self.pad)
         return y
+
+
+class RNN(Layer):
+    def __init__(self, hidden_size, in_size=None):
+        super().__init__()
+        self.x2h = Linear(hidden_size, in_size=in_size)
+        self.h2h = Linear(hidden_size, in_size=in_size, no_bias=True)
+        self.h = None
+
+    def rest_state(self):
+        self.h = None
+
+    def forward(self, x):
+        if self.h is None:
+            h_new = F.tanh(self.x2h(x))
+        else:
+            h_new = F.tanh(self.h2h(x) + self.x2h(x))
+        self.h = h_new
+        return h_new
 
 
 
